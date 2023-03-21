@@ -56,6 +56,7 @@ import {
 import {
     Board
 } from '../table/table.board'
+
 const TURN_TIME = 20000;
 const GAME_TIME = 120000;
 const DELAY_IN_GAME_END = 2000;
@@ -89,12 +90,12 @@ export class Game extends Table {
     public gameId: number;
     private isPrivate: boolean;
     private totalTurn: number;
-    private SnakeHead: Array < number > ;
+    public SnakeHead: Array < number > ;
     private SnakeTail: Array < number > ;
     private LadderHead: Array < number > ;
-    private LadderTail: Array < number > ;
+    public LadderTail: Array < number > ;
     private BoardId: number
-    private PowerCard: Array < number > ;
+    public PowerCard: Array < number > ;
     private PowerCardPath: Array < string > ;
     private PowerCan: Array < number >
     private isOnGameEndCallbackCalled: boolean
@@ -200,6 +201,7 @@ export class Game extends Table {
         }
 
         currentPlayer.skipped(false);
+        
         const diceValues = this.generateDv(currentPlayer, dv);
         let canMove = this.canMovePawn(currentPlayer.POS);
         //console.log("can move ", canMove);
@@ -368,9 +370,13 @@ export class Game extends Table {
     }
     public async onMovePawn(playerId: string, pawnIndex: number, rolledIndex: number,diceValue:number) {
         let currentPlayer = this.getCurrentPlayer();
-        this.players.forEach(async (player)=>{
-            await player.removePowerCounter();
-        })
+        
+        //remove has power of opponenet
+        let opponentPlayer:Player = this.getOpponentPlayer(currentPlayer.ID)
+        await opponentPlayer.removePowerCounter()
+        await currentPlayer.removePowerCounter();
+
+
         if (currentPlayer.ID != playerId) {
             const error = new BaseHttpResponse(null, "Invalid User" + currentPlayer.ID, 400, this.ID);
             throw error;
@@ -1004,11 +1010,12 @@ export class Game extends Table {
         const isValid = isValidPawnPositionPower(forPlayer.POS, diceValue, pawnPos, forPlayer.killedBefore);
         //console.log("isValid  ", isValid);
         if (isValid) {
+            const currentPlayer:Player = this.getCurrentPlayer();
+            await currentPlayer.removePowerStack(powerIndex)
             const resp = await this.updatePlayerCoinPositionPower(pawnIndex, diceValue,playerId,powerIndex);
             //console.log('New coin position', resp)
             if (resp && resp.coinEliminated) {
-                const currentPlayer:Player = this.getCurrentPlayer();
-                currentPlayer.removePowerStack(powerIndex)
+                
                 //check snake or ladder
                 if (resp.coinEliminated.switchSnakeOrLadderOrPower == SwitchSnakeOrLadderOrPower.SNAKE) {
                     forPlayer.updateHasKilled();
@@ -1023,9 +1030,6 @@ export class Game extends Table {
                 return resp;
             }
             if (resp && resp.reachedHome) {
-                const currentPlayer:Player = this.getCurrentPlayer();
-                currentPlayer.removePowerStack(powerIndex)
-                
                 return resp;
             }
             return true;
@@ -1280,6 +1284,8 @@ export class Game extends Table {
             player.CurrentPower = getPower;
             this.log("player get power on position "+pawnPos+" and current power is " + player.CurrentPower)
             this.log("pawnPosition for pawn power Stack " + player.getPowerStack())
+            console.log("====new power======="+getPower)
+            
             //remove the power card from powerCard and powercard path
             // if(this.PowerCard.indexOf(pawnPos) != -1){
             //     this.log("Power card array before remove => "+this.PowerCard)
@@ -1302,10 +1308,12 @@ export class Game extends Table {
     }
     private getPowerCard(player:Player,pawnPos: number) {
         // return 0
-        let index = this.PowerCard.indexOf(pawnPos)
+        let index = this.PowerCard.indexOf(pawnPos)                                                                 
+
         //let powerCan = this.PowerCan[index]
         let powerCan = this.getPowerRandom(player,this.PowerCan[index],0)
         this.log("we got the power " + powerCan)
+        console.log("we got the power " + powerCan)
         return powerCan;
     }
     private getPowerRandom(player:Player,power:number,i:number):any{
@@ -1512,11 +1520,11 @@ export class Game extends Table {
         this.rolledValues = [];
         this.turnPhase();
 
-        // let currentPlayer = this.getCurrentPlayer();
-        // if (currentPlayer.isXFac) {
-        //     this.log('Currenplayer is xfac in change turn', currentPlayer)
-        //     currentPlayer.xfac.makeMove();
-        // }
+        let currentPlayer = this.getCurrentPlayer();
+        if (currentPlayer.isXFac) {
+            this.log('Currenplayer is xfac in change turn', currentPlayer)
+            currentPlayer.xfac.makeMove();
+        }
     }
 
     private turnPhase() {
@@ -1596,7 +1604,7 @@ export class Game extends Table {
         return arr;
     }
     public getSnakePostion(position: number, pawnIndexUp:number, IsPower:boolean,powerIndex:number,includeCurrentPlayer = false): Array < any > {
-        let arr: any = [];
+        let arr: any = []; 
         let count = 0;
         this.players.forEach((player, playerIndex) => {
             if (!player.isPlaying) {
@@ -1621,9 +1629,13 @@ export class Game extends Table {
                         this.log('Cuurent player id=', this.getCurrentPlayer().ID, ' Player id=', player.ID)
                         return;
                     } else {
-                        if(count == 2){
-                            //console.log("two Player changes")
-                        }
+                        // if(count == 2){
+                        //     //console.log("two Player changes")
+                        // }
+                        let powerUser:number = player.GET_POWERUSED();
+                        this.log("power Used is == "+powerUser)
+
+                                
                         this.log("Path genrator previous stack ",player.previouspawnStack[pawnIndex], " new position ", player.getPawnStack()[pawnIndex] )
                             
                         let getSnakeIndex = this.SnakeHead.indexOf(position)
@@ -1640,8 +1652,29 @@ export class Game extends Table {
                             p.snakeHead = this.SnakeHead[getSnakeIndex];
                             p.switchSnakeOrLadderOrPower = SwitchSnakeOrLadderOrPower.SNAKE
                             if(IsPower){
-                                p.path = getRange(this.SnakeHead[getSnakeIndex],player.previouspawnStack[pawnIndex])
-                                p.path = p.path.reverse()
+                                this.log("power event come on snake position and power is "+powerUser,+"  "+p.snakeHead)
+                                if((player.getPawnStack()[pawnIndex]-player.previouspawnStack[pawnIndex] )<0){
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    if(powerUser== PowerCard.MINONE){
+                                        p.path = [p.snakeHead]
+                                    }
+                                     if(powerUser== PowerCard.MINTWO){
+                                        p.path = getRange(this.SnakeHead[getSnakeIndex]-1,player.previouspawnStack[pawnIndex])
+                                        p.path.pop();
+                                        p.path.reverse();
+                                    }
+                                }
+                                else{
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    else{
+                                        p.path = getRange(player.previouspawnStack[pawnIndex], this.SnakeHead[getSnakeIndex])
+                                    }
+                                }
+                                
                             }
                             else{
                                 p.path = getRange(player.previouspawnStack[pawnIndex], this.SnakeHead[getSnakeIndex])
@@ -1678,8 +1711,28 @@ export class Game extends Table {
                             p.ladderHead = this.LadderHead[getLadderIndex];
                             p.switchSnakeOrLadderOrPower = SwitchSnakeOrLadderOrPower.LADDER
                             if(IsPower){
-                                p.path = getRange(this.LadderTail[getLadderIndex],player.previouspawnStack[pawnIndex])
-                                p.path = p.path.reverse()
+                                if((player.getPawnStack()[pawnIndex]-player.previouspawnStack[pawnIndex] )<0){
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    if(powerUser== PowerCard.MINONE){
+                                        p.path = [this.LadderTail[getLadderIndex]]
+                                    }
+                                     if(powerUser== PowerCard.MINTWO){
+                                        p.path = getRange(this.LadderTail[getLadderIndex]-1,player.previouspawnStack[pawnIndex])
+                                        p.path.pop();
+                                        p.path.reverse();
+                                    }
+                                }
+                                else{
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    else{
+                                        p.path = getRange(player.previouspawnStack[pawnIndex], this.LadderTail[getLadderIndex])
+                                    }
+                                }
+                                
                             }
                             else{
                                 p.path = getRange(player.previouspawnStack[pawnIndex], this.LadderTail[getLadderIndex])
@@ -1696,20 +1749,30 @@ export class Game extends Table {
                             if(IsPower){
 
                                 if((player.getPawnStack()[pawnIndex]-player.previouspawnStack[pawnIndex] )<0){
-                                    if(player.getPowerStackByIndex(powerIndex)== PowerCard.REVERSE){
+                                    if(powerUser== PowerCard.REVERSE){
                                         p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    if(powerUser== PowerCard.MINONE){
+                                        p.path = [player.previouspawnStack[pawnIndex]-1]
+                                    }
+                                    if(powerUser== PowerCard.MINTWO){
+                                        p.path = getRange(player.getPawnStack()[pawnIndex]-1,player.previouspawnStack[pawnIndex])
+                                        p.path.pop();
+                                        p.path.reverse();
                                     }
                                     else{
                                         p.path = getRange(player.getPawnStack()[pawnIndex],player.previouspawnStack[pawnIndex])
                                         p.path = p.path.reverse()
                                     }
+                                }else{
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    else{
+                                        p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
+                                    }
                                 }
-                                // if(player.getPowerStackByIndex(powerIndex)== PowerCard.REVERSE){
-                                //     p.path = [player.previouspawnStack[pawnIndex]]
-                                // }
-                                // else{
-                                //     p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
-                                // }
+                                
                             }
                             else{
                                 p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
@@ -1725,23 +1788,34 @@ export class Game extends Table {
                             p.pawnIndex = pawnIndex;
                             p.switchSnakeOrLadderOrPower = SwitchSnakeOrLadderOrPower.NOTHING
                             this.log("dice value in game be ",player.getPawnStack()[pawnIndex]+"-"+player.previouspawnStack[pawnIndex])
-                            if((player.getPawnStack()[pawnIndex]-player.previouspawnStack[pawnIndex] )<0){
-                                if(player.getPowerStackByIndex(powerIndex)== PowerCard.REVERSE){
-                                    p.path = [player.previouspawnStack[pawnIndex]]
+                            if(IsPower){
+                                if((player.getPawnStack()[pawnIndex]-player.previouspawnStack[pawnIndex] )<0){
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    if(powerUser== PowerCard.MINONE){
+                                        p.path = [player.previouspawnStack[pawnIndex]-1]
+                                    }
+                                     if(powerUser== PowerCard.MINTWO){
+                                        p.path = getRange(player.getPawnStack()[pawnIndex]-1,player.previouspawnStack[pawnIndex])
+                                        p.path.pop();
+                                        p.path.reverse();
+                                    }
+                                    
                                 }
                                 else{
-                                    p.path = getRange(player.getPawnStack()[pawnIndex],player.previouspawnStack[pawnIndex])
-                                    p.path = p.path.reverse()
+                                    if(powerUser== PowerCard.REVERSE){
+                                        p.path = [player.previouspawnStack[pawnIndex]]
+                                    }
+                                    else{
+                                        p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
+                                    }
                                 }
                             }
                             else{
-                                if(player.getPowerStackByIndex(powerIndex)== PowerCard.REVERSE){
-                                    p.path = [player.previouspawnStack[pawnIndex]]
-                                }
-                                else{
-                                    p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
-                                }
+                                p.path = getRange(player.previouspawnStack[pawnIndex], player.getPawnStack()[pawnIndex])
                             }
+                            
                             
                             arr.push(p);
                         }
@@ -1910,12 +1984,21 @@ export class Game extends Table {
         let isRunning: boolean = false;
         let joiningSuccess: boolean = false;
         if (this.canJoin(playerOpts._id)) {
+            if(this.players.length==0){
+                playerOpts.color=1;
+                playerOpts.pos=0
+            }
+            else{
+                playerOpts.color=2;
+                playerOpts.pos=1
+            }
             const newPlayer = new Player(playerOpts);
             this.players.push(newPlayer);
             isRunning = this.onFullTable();
             this.gameLevel = gameLevel;
             this.xFacId = xFacId
             joiningSuccess = true
+            
         }
         //this.printPlayerArr();
         let resp = {
@@ -2019,6 +2102,7 @@ export class Game extends Table {
 
     private async onGameStart(contestData: ContestData) {
         try {
+            
             let board = await Board.Instance.getBoardTableRedis(this.ID)
             //start build from here
             this.SnakeHead = Board.Instance.SnakeHead;
@@ -2074,11 +2158,11 @@ export class Game extends Table {
             //console.log("=======startGame Event========")
             //console.log(resp)
             this.emit(httpResp, 'startGame')
-            this.players.forEach(player => {
-                if (player.isXFac) {
-                    player.startGame();
-                }
-            })
+            // this.players.forEach(player => {
+            //     if (player.isXFac) {
+            //         player.startGame();
+            //     }
+            // })
 
         } catch (err) {
             this.state = GameState.WAITING
@@ -2250,9 +2334,14 @@ export class Game extends Table {
         }
         // this.log(`Decrease counter for contest - ${this.CONTEST_ID} at - ${-(this.Capacity)}`)
         // await GameServer.Instance.ContestMethods.incContestCounter(this.CONTEST_ID, -(this.Capacity));
-
+        
 
         let winningData = this.getWinningUserData()
+        let currentPlayer = this.getCurrentPlayer();
+        if (currentPlayer.isXFac) {
+            this.log('Currenplayer is xfac in change turn', currentPlayer)
+            currentPlayer.xfac.destroyOnEnd(currentPlayer.MID);
+        }
         let ack = await GameServer.Instance.RabbitMQ.pushToWinningQueue(winningData)
         this.log('Winning data ack of rabit mq', ack, winningData)
         this.sendGameEndResp();
@@ -2398,7 +2487,7 @@ export class Game extends Table {
         }
     }
 
-    private getPlayerById(playerId: string) {
+    public getPlayerById(playerId: string) {
         for (let i = 0; i < this.players.length; i++) {
             if (this.players[i].ID == playerId) {
                 return this.players[i];
@@ -2465,6 +2554,13 @@ export class Game extends Table {
     public getOpponentScore(playerId: string): number {
         return this.players.find((p) => p.ID != playerId) ?.SCORE
     }
+    public getOpponentPlayer(playerId: string): Player {
+        for (let index = 0; index < this.players.length; index++) {
+            if(this.players[index].ID != playerId){
+                return this.players[index];
+            }
+        }
+    }
 
     public getOpponentMid(playerId: string): number {
         return this.players.find((p) => p.ID != playerId) ?.MID
@@ -2485,6 +2581,8 @@ export class Game extends Table {
     }
 
     public pathMaker(path: Array < number > ) {
+        console.log("Path created on "+path)
+        this.log("Path created on "+path)
         let pathMake: Array < string >= [];
         path.forEach((pos) => {
             if (pos.toString().length == 1) {
@@ -2507,6 +2605,25 @@ export class Game extends Table {
             this.turnIndex = (this.turnIndex + 1) % (this.players.length);
         }
         return this.turnIndex
+    }
+    public get PLAYERS() {
+        return this.players
+    }
+    public isTimePassed(percent: number = 100) {
+        let resp = false;
+        this.log('Time passed function called', this.gameMode)
+        // if (this.gameMode == GameMode.TIME_BASED) {
+            let timePassed = Date.now() - this.gameStartTime
+            let timePassedPercent = Math.floor(timePassed / this.gameTime * 100)
+            resp = timePassedPercent > percent
+        // } else if (this.gameMode == GameMode.TURN_BASED) {
+        //     let turnPassed = this.totalTurn - this.gameTurnRemaining;
+        //     let turnPassedPercent = Math.floor(turnPassed / this.totalTurn * 100)
+        //     resp = turnPassedPercent > percent
+        // }
+        this.log('Time passed result', resp);
+        return resp;
+
     }
     
 }

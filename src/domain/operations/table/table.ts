@@ -13,6 +13,8 @@ export class Table {
     protected state : number
     protected turnIndex : number
     protected contestId: string
+    protected xFacId: string;
+    protected xFacLevel: number;
     public constructor(opts : any) {
         this._id = opts._id || new Mongoose.Types.ObjectId().toString();
         this.capacity = 2;
@@ -108,5 +110,12 @@ export class Table {
 
     public get CONTEST_ID(): string{
         return this.contestId;
+    }
+    public setXFacData(xFacId: string, xFacLevel: number){
+        this.xFacId = xFacId;
+        this.xFacLevel = xFacLevel;
+    }
+    public getXFacData(){
+        return {xFacId: this.xFacId, xFacLevel: this.xFacLevel}
     }
 }

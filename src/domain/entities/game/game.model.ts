@@ -39,6 +39,20 @@ export enum MoveType{
     NORMAL_RISK = 5
 
 }
+export enum MoveTypePower{
+    HOME=1,
+    LADDER=2,
+    POWER=3,
+    SNAKE=4,
+    NOTHING=5
+}
+export enum MoveTypePowerOwn{
+    HOME=1,
+    LADDER=2,
+    POWER=3,
+    NOTHING=4,
+    SNAKE=5
+}
 export enum GameType {
     NORMAL = 1,
     XFAC_EASY = 2,
@@ -48,9 +62,18 @@ export enum GameType {
 
 export interface XFacMove{
     pawnIndex: number,
-    moveType: MoveType,
+    moveType: MoveTypePowerOwn,
     newPos: number
 }
+
+export interface XFacPower{
+    playerID:string,
+    pawnIndex: number,
+    powerIndex:number,
+    moveType: MoveTypePower,
+    newPos: number
+}
+
 
 export enum GamePhase {
     ROLL_DICE = 1,
@@ -208,4 +231,7 @@ export enum SnakePath{
 export enum ReasonMovePath{
     NORMAL=1,
     POWER=2
+}
+export enum HomePosition{
+    HOME=64
 }

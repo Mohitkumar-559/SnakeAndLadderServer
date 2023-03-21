@@ -1,16 +1,18 @@
-import { GameServer } from "application";
-import SQL from "database/sql";
-import { GameIds } from "domain/entities/game/game.model";
-import { XFacGameLog } from "domain/entities/xfac/xfac.dto";
+import { GameServer } from "../../../application";
 import Redis from "ioredis";
-import needle from "needle";
-import { gameLog } from "utils/logger";
+import UnitOfWork from "../../../database/sql";
+import needle from 'needle';
+import { gameLog } from "../../../utils/logger";
+import { XFacGameLog } from "./xfac.dto";
+
 
 export class XFacService {
-    sql: SQL;
+    _redisClient: Redis;
+    uow: UnitOfWork;
     private static _instance: XFacService;
     constructor() {
-        this.sql = SQL.Instance;
+        this._redisClient = GameServer.Instance.REDIS.REDIS_CLIENT
+        this.uow = GameServer.Instance.TransactionMethods.SQL_Instance
     }
     static get Instance() {
         if (!this._instance) {
@@ -19,21 +21,21 @@ export class XFacService {
         return this._instance;
     }
 
-    async getUserToken(amount: number, mba: number, gameServerId: string, opponentId: number, gameId: number) {
+    async getUserToken(amount: number, mba: number, gameId: string, opponentId: number) {
         try {
-            gameLog(gameServerId, 'req for xfac token', amount, mba)
-            const proc_contest_name = gameId == GameIds.FRUIT_CUT ? "PROC_GetFruitCutUserForXFacPlay" : "PROC_GetKnifeHitUserForXFacPlay"
-            let param_contest = `@Amount=${amount}, @BonusApplicable=${mba}, @UserId=${opponentId}, @RequestFrom='${gameServerId}'`;
+            gameLog(gameId, 'req for xfac token', amount, mba)
+            const proc_contest_name = "PROC_GetUserForXFacPlay_V2"
+            let param_contest = `@Amount=${amount}, @BonusApplicable=${mba}, @UserId=${opponentId}, @RequestFrom='${gameId}'`;
             gameLog('xfacLog', 'Getting xfac for ', param_contest);
-            let resp = await this.sql.GetDataFromTransaction(proc_contest_name, param_contest);
+            let resp = await this.uow.GetDataFromTransaction(proc_contest_name, param_contest);
             gameLog('xfacLog', 'res xfac for ', param_contest, resp);
-            gameLog(gameServerId, 'result from get user sp', resp);
+            gameLog(gameId, 'result from get user sp', resp);
             if (resp && resp.length > 0) {
                 if(resp[0].ResponseStatus != 1){
                     // gameLog('Response status 0 in getUser SP', resp);
                     throw new Error("Unable to get xfac for user");
                 }
-                let token = await this.getToken(resp[0].UserId, gameServerId)
+                let token = await this.getToken(resp[0].UserId, gameId)
                 return {
                     token: token,
                     xFacLevel: resp[0].XFacLevel,
@@ -58,12 +60,13 @@ export class XFacService {
         throw new Error('Unable to get data from token API')
     }
 
-    async saveXFacGameLog(data: XFacGameLog, gameId: number){
+    async saveXFacGameLog(data: XFacGameLog){
         try {
-            const proc_contest_name = gameId == GameIds.FRUIT_CUT ? "PROC_CreateFruitCutXFacGameLog": "PROC_CreateKnifeHitXFacGameLog"
+            const proc_contest_name = "PROC_CreateLudoXFacGameLog"
             let param_contest = `@UserId=${data.UserId}, @XFacId=${data.XFacId}, @XFacLevel=${data.XFacLevel}, @Result=${data.Result}, @RoomId=${data.RoomId}, @ContestId=${data.ContestId}, @XFacLogId=${data.xFacLogId}`;
-            let resp = await this.sql.GetDataFromTransaction(proc_contest_name, param_contest);
+            let resp = await this.uow.GetDataFromTransaction(proc_contest_name, param_contest);
         } catch (err) {
+            console.log('Error in get xfac user', err);
             //console.log('Error in save xfac user log', err);
             throw err
         }       
@@ -73,7 +76,7 @@ export class XFacService {
             const proc_contest_name = "PROC_UPDATE_LUDO_XFac_USER_STATUS"
             let param_contest = `@UserId=${userMid}`;
             gameLog(gameId, 'Freeing xfac user ');
-            let resp = await this.sql.GetDataFromTransaction(proc_contest_name, param_contest);
+            let resp = await this.uow.GetDataFromTransaction(proc_contest_name, param_contest);
             gameLog(gameId, 'Freeing xfac user resp ', resp);
             // if (resp && resp.length > 0) {
             //     if(resp[0].ResponseStatus != 1){
@@ -84,7 +87,7 @@ export class XFacService {
             // throw new Error("Unable to free xfac from PROC_UPDATE_LUDO_XFac_USER_STATUS")
         } catch (err) {
             gameLog(gameId, 'Error in Freeing xfac user ', err.toString());
-            //console.log('Error in free xfac user', err);
+            console.log('Error in free xfac user', err);
             throw err
         }
     }

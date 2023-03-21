@@ -9,12 +9,10 @@ import { TableManager } from '../table/table.manager'
 import { ERROR_CODE } from 'utils/error.dto'
 import { GameConfig, GameState } from 'domain/entities/game/game.model'
 import { Game } from '../game/game'
-import { XFacAbstract } from '../xfac/xfac.abstract'
-import { FruitCutXFac } from '../xfac/fruitcut.xfac'
-import { XFacManager } from '../xfac/xfac.manager'
+import { XFac } from '../xfac/xfac'
 const WAITING_TIME = Number(process.env.WAITING_TIME);
 export class User {
-    private userId: string
+    public userId: string
     private name: string
     private did: string
     private mid: number;
@@ -23,9 +21,9 @@ export class User {
     private socket: socketIO.Socket
     private waitingTimer: NodeJS.Timeout
     public game: Game
-    public xfac: XFacAbstract
+    public xfac: XFac
     private playerType: PlayerType;
-    constructor(socket: socketIO.Socket, user: IUser, xfac: XFacAbstract = null) {
+    constructor(socket: socketIO.Socket, user: IUser, xfac: XFac = null) {
         this.userId = user._id;
         this.name = user.name;
         this.did = user.did;
@@ -167,7 +165,7 @@ export class User {
             //console.log("gameObject ", this.game);
             this.joinRoom(this.game.ID);
             this.game.log(`On game join of ${this.name} resp=>`, resp)
-            //this.startWaitingTimeout(maxWaitingTime - 7000);
+            this.startWaitingTimeout(maxWaitingTime - 7000);
             return callback(resp);
         } else if (gameObject.isFinished() || gameObject.isDestroyed()) {
             return callback(new BaseHttpResponse({}, "Game Is Finsihed", ERROR_CODE.GAME_ENDED, this.game?.ID));
@@ -221,6 +219,7 @@ export class User {
             const resp = new BaseHttpResponse(null, JSON.stringify(error), 400, this.game?.ID);
             this.game?.log('Error on rollDice=>', resp)
             callback(resp)
+            return resp
         }
     }
     private async exitBeforeMatchMaking() {
@@ -327,6 +326,8 @@ export class User {
             name: this.name,
             did: this.did,
             mid: this.mid,
+            pos:1,
+            color:2,
             referCode: this.referCode,
             playerType: this.playerType,
             xfac: this.xfac
@@ -366,7 +367,7 @@ export class User {
             if (this.game.gameConfig == GameConfig.USER_FIRST) {
                 this.game?.log('Creating xfac and joining him in match');
                 try {
-                    let xfac = XFacManager.getXFac(this.game);
+                    let xfac = new XFac(this.game);
                     xfac.joinMatch(this.mid)
                     return
                 } catch (err) {

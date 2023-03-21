@@ -2,9 +2,7 @@ import { PlayerOpts, PlayerState, PlayerType } from "domain/entities/player/play
 import { WINNING_POSITION } from '../../entities/game/game.model'
 import { Game } from "../game/game"
 import { gameLog } from 'utils/logger'
-import { FruitCutXFac } from "../xfac/fruitcut.xfac"
-import { XFacAbstract } from "../xfac/xfac.abstract"
-import { XFacManager } from "../xfac/xfac.manager"
+import { XFac } from '../xfac/xfac'
 import { pathValue, getPawnIndex, PLAYER_PATH, SAFE_CELLS, validateNewPosition, getRouteFirstValue, totalDistance } from '../game/path'
 export const EXIT_COIN_POSITION = 0
 export class Player {
@@ -28,11 +26,12 @@ export class Player {
     private prize: number;
     private totalGameWinner: number;
     private playerType: PlayerType;
-    public xfac: XFacAbstract;
+    public xfac: XFac;
     private dvStack: Array<number>;
     public Powerstack: Array<number>;
     public CurrentPower:number;
     public previouspawnStack: Array<number>;
+    public powerUsed:number;
     public powerIndex:number
     constructor(opts: PlayerOpts) {
         //console.log("Player opts ", opts);
@@ -60,6 +59,7 @@ export class Player {
         this.hasPower=false;
         this.CurrentPower=4;
         this.powerIndex=0;
+        this.powerUsed=4;
         //console.log("Position ", this.pos);
         //console.log("Paws stack for pos ", this.pos);
         //console.log("Paws stack : ", this.pawnStack);
@@ -87,11 +87,12 @@ export class Player {
         this.CurrentPower=4;
         if(this.playerType == PlayerType.XFAC){
             game.log('Creating xfac on playerInitOnRestart')
-            this.xfac = XFacManager.getXFac(game);
+            this.xfac = new XFac(game);
             this.xfac.initOnRestart();
         }
         this.Powerstack = opts.Powerstack;
-        this.powerIndex = opts.powerIndex
+        this.powerIndex = opts.powerIndex;
+        this.powerUsed = opts.powerUsed;
     }
     
     public playerProperties(): any {
@@ -212,8 +213,7 @@ export class Player {
     public get DID(): string {
         return this.did;
     }
-
-    public get MID(): number {
+     public get MID(): number {
         return this.mid;
     }
 
@@ -248,9 +248,9 @@ export class Player {
         }
     }
 
-    public startGame(){
-        this.xfac?.startGame();
-    }
+    // public startGame(){
+    //     this.xfac?.startGame();
+    // }
 
     public updatePlayerState(state: number, rank?: number, prize?: number): boolean {
         if (prize >= 0) {
@@ -436,15 +436,15 @@ export class Player {
         for (let i = 0; i < this.pawnStack.length; i++) {
             if (this.pawnStack[i] == pawnPos) {
 
-                this.log("=======adding power stack=========");
+                console.log("=======adding power stack=========");
                 //this.Powerstack.push(power)
                 if(this.Powerstack.length<3){
-                    this.log("Power add to powerstack"+power)
+                    console.log("Power add to powerstack"+power)
                     this.Powerstack.push(power)
                     this.hasPower = true;
                 }
                 else{
-                    this.log("Not able to Power add to powerstack"+power, this.Powerstack)
+                    console.log("Not able to Power add to powerstack"+power, this.Powerstack)
                     this.hasPower = false;
                 }
                 this.powerIndex++;
@@ -454,8 +454,9 @@ export class Player {
         
     }
 
-    public removePowerStack(index:number){
-        //console.log("=======remove power stack=========")
+    public async removePowerStack(index:number){
+        console.log("=======remove power stack=========")
+        this.powerUsed = this.Powerstack[index];
         this.Powerstack.splice(index,1)
     }
 
@@ -473,6 +474,20 @@ export class Player {
         this.hasKilled=false;
         this.hasKilled=false;
     }
+    public calculateCoinPosition(pawnIndex: number, diceValue: number) {
+        const position = this.pawnStack[pawnIndex];
+        const positionIndex = getPawnIndex(this.pos, position, this.hasKilled);
+        const newPositionIndex = diceValue + positionIndex;
+        const newPosition = pathValue(this.pos, newPositionIndex, this.hasKilled);
+        return newPosition
+    }
+
+    public GET_POWERUSED():any{
+        return this.powerUsed;
+    }
+    
+
+   
     
 
     

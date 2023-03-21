@@ -29,11 +29,11 @@ export class Board {
         this.Snake4 = ["17","18","07"]
         this.LadderHead = [16,39]
         this.LadderTail = [10,28]
-        this.PowerCan = [-2,-1,0,1,2,-2]
-        this.PowerCard = [0,0,0]
+        this.PowerCan = [2,1,0,-1,-2]
+        this.PowerCard = [62,2,3]
         this.DicardArray=[1,64,57,6];
         this.boardId = boardId;
-        this.PowerCardPath =["00","00","00"]
+        this.PowerCardPath =["62","02","03"]
 
     }
     public static get Instance()
@@ -55,24 +55,7 @@ export class Board {
                 this.LadderHead = board.ladder.head;
                 this.LadderTail = board.ladder.tail;
             });
-            this.LadderTail.push(4)
-            this.LadderHead.push(61)
-            this.LadderTail.push(7)
-            this.LadderHead.push(61)
-            this.LadderTail.push(6)
-            this.LadderHead.push(61)
-            let exclude:Array<number>=[];
-            // for (let index = 0; index < this.PowerCan.length; index++) {
-            //     if(index == 0){
-            //         exclude.push(4);
-            //     }
-            //     else{
-            //         exclude.push(this.PowerCan[index-1]);
-            //     }
-
-            //     this.PowerCan[index] = this.randomIntFromInterval(-2,2,exclude);
-
-            // }
+            
             this.PowerCan = this.shuffle(this.PowerCan)
 
             let dicard = this.DicardArray.concat(this.LadderHead,this.LadderTail,this.SnakeHead,this.SnakeTail)
@@ -144,11 +127,7 @@ export class Board {
         const keyOfgameBoard = RedisKeys.getGamePowerCard(this.boardId,gameId)
             //getting data from redis in game
             const dataFromRedis:any = await this.redis.get(keyOfgameBoard)
-            // dataFromRedis.forEach((board:any)=> {
-            //     this.PowerCan = board.PowerCan;
-            //     this.PowerCard = board.PowerCard;
-            //     this.PowerCardPath = board.PowerCardPath;
-            // });
+            
         
         return dataFromRedis
     }

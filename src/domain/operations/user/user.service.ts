@@ -6,9 +6,7 @@ import { BaseResponse } from "utils/base.response";
 import { gameLog } from "utils/logger";
 import { Game } from "../game/game";
 import { TableManager } from "../table/table.manager";
-import { FruitCutXFac } from "../xfac/fruitcut.xfac";
-import { XFacManager } from "../xfac/xfac.manager";
-
+import { XFac } from "../xfac/xfac";
 class UserService {
     private static _instance: UserService;
 
@@ -85,7 +83,7 @@ class UserService {
 
             if(ticket.metaData?.gameConfig == GameConfig.XFAC_FIRST && ticket.metaData?.xFacId){
                 try {
-                    let xfac = XFacManager.getXFac(game);
+                    let xfac = new XFac(game);
                     xfac.joinMatch(user.mid, ticket.metaData?.xFacId, ticket.metaData?.xFacLevel)
                 } catch(err){
                     //console.log(err)

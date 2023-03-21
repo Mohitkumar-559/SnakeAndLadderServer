@@ -1,4 +1,4 @@
-import { XFacAbstract } from 'domain/operations/xfac/xfac.abstract'
+import { XFac } from '../../operations/xfac/xfac'
 import mongoose from 'mongoose'
 import { GameConfig } from '../game/game.model'
 export enum PlayerState {
@@ -31,7 +31,7 @@ export type PlayerOpts = {
     referCode?: string,
     totalGameWinners?: number,
     playerType?: PlayerType,
-    xfac?: XFacAbstract
+    xfac?: XFac
 }
 export interface IPlayer {
   _id: string

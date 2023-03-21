@@ -165,4 +165,8 @@ export class TransactionMethod {
             throw new BadRequest(JSON.stringify(ex.message), ERROR_CODE.EXCEPTION);
         }
     }
+
+    public get SQL_Instance(): SQL {
+        return this.sql
+    } 
 }

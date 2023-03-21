@@ -1,5 +1,6 @@
 import * as sql from "mssql";
 import { gameLog } from "utils/logger";
+import { Service } from "typedi";
 
 class SQL {
   private static _instance: SQL; 
